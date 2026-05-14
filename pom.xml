@@ -31,6 +31,12 @@
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<!-- AWS S3 SDK — compatible with DigitalOcean Spaces (S3-compatible API) -->
+		<dependency>
+			<groupId>com.amazonaws</groupId>
+			<artifactId>aws-java-sdk-s3</artifactId>
+			<version>1.12.780</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>

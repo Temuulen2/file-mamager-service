@@ -1,3 +1,4 @@
 com\example\demo\controller\FileController.class
 com\example\demo\FileManagerServiceApplication.class
+com\example\demo\middleware\AuthMiddleware.class
 com\example\demo\service\FileService.class

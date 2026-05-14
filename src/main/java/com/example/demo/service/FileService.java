@@ -1,20 +1,53 @@
 package com.example.demo.service;
 
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
+import com.amazonaws.auth.BasicAWSCredentials;
+import com.amazonaws.client.builder.AwsClientBuilder;
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
+import com.amazonaws.services.s3.model.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.annotation.PostConstruct;
 import java.io.IOException;
-import java.nio.file.*;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class FileService {
 
-    @Value("${file.upload-dir}")
-    private String uploadDir;
+    @Value("${spaces.access.key}")
+    private String accessKey;
+
+    @Value("${spaces.secret.key}")
+    private String secretKey;
+
+    @Value("${spaces.endpoint}")
+    private String endpoint;
+
+    @Value("${spaces.region}")
+    private String region;
+
+    @Value("${spaces.bucket}")
+    private String bucket;
+
+    @Value("${spaces.cdn.base}")
+    private String cdnBase;
+
+    private AmazonS3 s3Client;
+
+    @PostConstruct
+    public void init() {
+        BasicAWSCredentials creds = new BasicAWSCredentials(accessKey, secretKey);
+        s3Client = AmazonS3ClientBuilder.standard()
+                .withEndpointConfiguration(new AwsClientBuilder.EndpointConfiguration(endpoint, region))
+                .withCredentials(new AWSStaticCredentialsProvider(creds))
+                .withPathStyleAccessEnabled(true)
+                .build();
+    }
 
     public String saveFile(MultipartFile file) throws IOException {
         String originalFilename = file.getOriginalFilename();
@@ -24,43 +57,37 @@ public class FileService {
         }
         String filename = UUID.randomUUID().toString() + ext;
 
-        Path dirPath = Paths.get(uploadDir);
-        if (!Files.exists(dirPath)) {
-            Files.createDirectories(dirPath);
-        }
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(file.getSize());
+        metadata.setContentType(file.getContentType());
 
-        Path filePath = dirPath.resolve(filename);
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+        PutObjectRequest putRequest = new PutObjectRequest(bucket, filename, file.getInputStream(), metadata)
+                .withCannedAcl(CannedAccessControlList.PublicRead);
 
+        s3Client.putObject(putRequest);
         return filename;
     }
 
-    public Path getFilePath(String filename) {
-        return Paths.get(uploadDir).resolve(filename).normalize();
+    /** Returns the public HTTPS URL of the file on Spaces CDN */
+    public String getFileUrl(String filename) {
+        // Virtual-hosted style: https://{bucket}.{region}.digitaloceanspaces.com/{filename}
+        return cdnBase.replaceAll("/$", "") + "/" + filename;
     }
 
     public List<String> listFiles() {
-        List<String> names = new ArrayList<>();
-        try {
-            Path dirPath = Paths.get(uploadDir);
-            if (!Files.exists(dirPath)) return names;
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dirPath)) {
-                for (Path entry : stream) {
-                    names.add(entry.getFileName().toString());
-                }
-            }
-        } catch (IOException e) {
-            // return empty list
-        }
-        return names;
+        ObjectListing listing = s3Client.listObjects(bucket);
+        return listing.getObjectSummaries()
+                .stream()
+                .map(S3ObjectSummary::getKey)
+                .collect(Collectors.toList());
     }
 
-    public boolean deleteFile(String filename) throws IOException {
-        Path filePath = getFilePath(filename);
-        // Prevent path traversal
-        if (!filePath.startsWith(Paths.get(uploadDir).toAbsolutePath())) {
+    public boolean deleteFile(String filename) {
+        try {
+            s3Client.deleteObject(bucket, filename);
+            return true;
+        } catch (Exception e) {
             return false;
         }
-        return Files.deleteIfExists(filePath);
     }
 }
