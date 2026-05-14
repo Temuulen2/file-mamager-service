@@ -19,22 +19,22 @@ import java.util.stream.Collectors;
 @Service
 public class FileService {
 
-    @Value("${spaces.access.key}")
+    @Value("${spaces.access.key:}")
     private String accessKey;
 
-    @Value("${spaces.secret.key}")
+    @Value("${spaces.secret.key:}")
     private String secretKey;
 
-    @Value("${spaces.endpoint}")
+    @Value("${spaces.endpoint:https://sgp1.digitaloceanspaces.com}")
     private String endpoint;
 
-    @Value("${spaces.region}")
+    @Value("${spaces.region:sgp1}")
     private String region;
 
-    @Value("${spaces.bucket}")
+    @Value("${spaces.bucket:}")
     private String bucket;
 
-    @Value("${spaces.cdn.base}")
+    @Value("${spaces.cdn.base:}")
     private String cdnBase;
 
     private AmazonS3 s3Client;
